@@ -1,7 +1,10 @@
 package com.nodename.Delaunay
 {
+	import com.luketramps.vorox.data.VectorBoolPool;
+	import com.luketramps.vorox.data.VectorEdgePool;
+	import com.luketramps.vorox.data.VectorLrPool;
 	
-	
+	// Lukes Mod. Using EdgeReorderer2 instead.
 	internal final class EdgeReorderer
 	{
 		private var _edges:Vector.<Edge>;
@@ -21,8 +24,8 @@ package com.nodename.Delaunay
 			{
 				throw new ArgumentError("Edges: criterion must be Vertex or Site");
 			}
-			_edges = new Vector.<Edge>();
-			_edgeOrientations = new Vector.<LR>();
+			_edges = VectorEdgePool.getObjFromSubpool ();
+			_edgeOrientations = VectorLrPool.getObjFromSubpool ()//new Vector.<LR>();
 			if (origEdges.length > 0)
 			{
 				_edges = reorderEdges(origEdges, criterion);
@@ -35,37 +38,45 @@ package com.nodename.Delaunay
 			_edgeOrientations = null;
 		}
 
-		private function reorderEdges(origEdges:Vector.<Edge>, criterion:Class):Vector.<Edge>
+		
+		private final function reorderEdges(origEdges:Vector.<Edge>, criterion:Class):Vector.<Edge>
 		{
 			var i:int;
 			var j:int;
 			var n:int = origEdges.length;
 			var edge:Edge;
 			// we're going to reorder the edges in order of traversal
-			var done:Vector.<Boolean> = new Vector.<Boolean>(n, true);
+			var done:Vector.<Boolean> = VectorBoolPool.getObjFromSubpool (n); //new Vector.<Boolean>//(n, true);
 			var nDone:int = 0;
-			for each (var b:Boolean in done)
-			{
-				b = false;
-			}
-			var newEdges:Vector.<Edge> = new Vector.<Edge>();
+			
+			//var doneLength:uint = done.length;
+			//for (var l:int = 0; l < doneLength; l++) 
+			//{
+				//done[l] = false;
+			//}
+			//for each (var b:Boolean in done)
+			//{
+				//b = false;
+			//}
+			var newEdges:Vector.<Edge> = VectorEdgePool.getObjFromSubpool ();
 			
 			i = 0;
 			edge = origEdges[i];
 			newEdges.push(edge);
 			_edgeOrientations.push(LR.LEFT);
-			var firstPoint:ICoord = (criterion == Vertex) ? edge.leftVertex : edge.leftSite;
-			var lastPoint:ICoord = (criterion == Vertex) ? edge.rightVertex : edge.rightSite;
+			var firstSiteVX:ICoord = (criterion == Vertex) ? edge.leftVertex : edge.leftSite;
+			var lastSiteVX:ICoord = (criterion == Vertex) ? edge.rightVertex : edge.rightSite;
 			
-			if (firstPoint == Vertex.VERTEX_AT_INFINITY || lastPoint == Vertex.VERTEX_AT_INFINITY)
+			if (firstSiteVX == Vertex.VERTEX_AT_INFINITY || lastSiteVX == Vertex.VERTEX_AT_INFINITY)
 			{
-				return new Vector.<Edge>();
+				return VectorEdgePool.getObjFromSubpool ();
 			}
 			
 			done[i] = true;
 			++nDone;
 			
-			while (nDone < n)
+			//while (nDone < n)
+			for (var k:int = 0; k < n; k++)
 			{
 				for (i = 1; i < n; ++i)
 				{
@@ -74,36 +85,36 @@ package com.nodename.Delaunay
 						continue;
 					}
 					edge = origEdges[i];
-					var leftPoint:ICoord = (criterion == Vertex) ? edge.leftVertex : edge.leftSite;
-					var rightPoint:ICoord = (criterion == Vertex) ? edge.rightVertex : edge.rightSite;
-					if (leftPoint == Vertex.VERTEX_AT_INFINITY || rightPoint == Vertex.VERTEX_AT_INFINITY)
+					var leftSiteVX:ICoord = (criterion == Vertex) ? edge.leftVertex : edge.leftSite;
+					var rightSiteVX:ICoord = (criterion == Vertex) ? edge.rightVertex : edge.rightSite;
+					if (leftSiteVX == Vertex.VERTEX_AT_INFINITY || rightSiteVX == Vertex.VERTEX_AT_INFINITY)
 					{
-						return new Vector.<Edge>();
+						return VectorEdgePool.getObjFromSubpool ();
 					}
-					if (leftPoint == lastPoint)
+					if (leftSiteVX == lastSiteVX)
 					{
-						lastPoint = rightPoint;
+						lastSiteVX = rightSiteVX;
 						_edgeOrientations.push(LR.LEFT);
 						newEdges.push(edge);
 						done[i] = true;
 					}
-					else if (rightPoint == firstPoint)
+					else if (rightSiteVX == firstSiteVX)
 					{
-						firstPoint = leftPoint;
+						firstSiteVX = leftSiteVX;
 						_edgeOrientations.unshift(LR.LEFT);
 						newEdges.unshift(edge);
 						done[i] = true;
 					}
-					else if (leftPoint == firstPoint)
+					else if (leftSiteVX == firstSiteVX)
 					{
-						firstPoint = rightPoint;
+						firstSiteVX = rightSiteVX;
 						_edgeOrientations.unshift(LR.RIGHT);
 						newEdges.unshift(edge);
 						done[i] = true;
 					}
-					else if (rightPoint == lastPoint)
+					else if (rightSiteVX == lastSiteVX)
 					{
-						lastPoint = leftPoint;
+						lastSiteVX = leftSiteVX;
 						_edgeOrientations.push(LR.RIGHT);
 						newEdges.push(edge);
 						done[i] = true;

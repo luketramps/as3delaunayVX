@@ -1,25 +1,20 @@
 package com.nodename.Delaunay
 {
-	import flash.geom.Point;
+	import com.luketramps.vorox.data.HalfEdgePool;
+	import com.luketramps.vorox.data.PointVX;
 	
-	internal final class Halfedge
+	public final class Halfedge
 	{
-		private static var _pool:Vector.<Halfedge> = new Vector.<Halfedge>();
 		public static function create(edge:Edge, lr:LR):Halfedge
 		{
-			if (_pool.length > 0)
-			{
-				return _pool.pop().init(edge, lr);
-			}
-			else
-			{
-				return new Halfedge(PrivateConstructorEnforcer, edge, lr);
-			}
+			throw new Error ("Depraced.");
+			return null;
 		}
 		
 		public static function createDummy():Halfedge
 		{
-			return create(null, null);
+			throw new Error ("Depraced.");
+			return null; //create(null, null);
 		}
 		
 		public var edgeListLeftNeighbor:Halfedge, edgeListRightNeighbor:Halfedge;
@@ -32,17 +27,7 @@ package com.nodename.Delaunay
 		// the vertex's y-coordinate in the transformed Voronoi space V*
 		public var ystar:Number;
 
-		public function Halfedge(lock:Class, edge:Edge = null, lr:LR = null)
-		{
-			if (lock != PrivateConstructorEnforcer)
-			{
-				throw new Error("Halfedge constructor is private");
-			}
-			
-			init(edge, lr);
-		}
-		
-		private function init(edge:Edge, lr:LR):Halfedge
+		public function init(edge:Edge, lr:LR):Halfedge
 		{
 			this.edge = edge;
 			leftRight = lr;
@@ -71,7 +56,6 @@ package com.nodename.Delaunay
 			edge = null;
 			leftRight = null;
 			vertex = null;
-			_pool.push(this);
 		}
 		
 		public function reallyDispose():void
@@ -82,10 +66,9 @@ package com.nodename.Delaunay
 			edge = null;
 			leftRight = null;
 			vertex = null;
-			_pool.push(this);
 		}
 
-		internal function isLeftOf(p:Point):Boolean
+		internal function isLeftOf(p:PointVX):Boolean
 		{
 			var topSite:Site;
 			var rightOfSite:Boolean, above:Boolean, fast:Boolean;
@@ -148,5 +131,3 @@ package com.nodename.Delaunay
 
 	}
 }
-
-class PrivateConstructorEnforcer {}

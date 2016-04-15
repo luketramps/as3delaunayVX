@@ -1,9 +1,9 @@
 package com.nodename.Delaunay
 {
-	import flash.geom.Point;
+	import com.luketramps.vorox.data.PointVX;
 	
 	internal interface ICoord
 	{
-		function get coord():Point;
+		function get coord():PointVX;
 	}
 }

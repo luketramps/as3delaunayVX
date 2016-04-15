@@ -1,9 +1,9 @@
 package com.nodename.Delaunay
 {
 	import __AS3__.vec.Vector;
-	import flash.geom.Point;
+	import com.luketramps.vorox.data.PointVX
 	
-	internal function selectEdgesForSitePoint(coord:Point, edgesToTest:Vector.<Edge>):Vector.<Edge>
+	internal function selectEdgesForSitePoint(coord:PointVX, edgesToTest:Vector.<Edge>):Vector.<Edge>
 	{
 		return edgesToTest.filter(myTest);
 		

@@ -1,12 +1,13 @@
 package com.nodename.geom
 {
-	import flash.geom.Point;
+	import com.luketramps.vorox.data.PointVX;
 
+	// Lukes Mod. Using Polygon2 instead.
 	public final class Polygon
 	{
-		private var _vertices:Vector.<Point>;
+		private var _vertices:Vector.<PointVX>;
 
-		public function Polygon(vertices:Vector.<Point>)
+		public function Polygon(vertices:Vector.<PointVX>)
 		{
 			_vertices = vertices;
 		}
@@ -34,13 +35,13 @@ package com.nodename.geom
 		{
 			var index:uint, nextIndex:uint;
 			var n:uint = _vertices.length;
-			var point:Point, next:Point;
+			var point:PointVX, next:PointVX;
 			var signedDoubleArea:Number = 0;
 			for (index = 0; index < n; ++index)
 			{
 				nextIndex = (index + 1) % n;
-				point = _vertices[index] as Point;
-				next = _vertices[nextIndex] as Point;
+				point = _vertices[index] as PointVX;
+				next = _vertices[nextIndex] as PointVX;
 				signedDoubleArea += point.x * next.y - next.x * point.y;
 			}
 			return signedDoubleArea;

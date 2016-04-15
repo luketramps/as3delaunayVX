@@ -20,6 +20,6 @@ package com.nodename.Delaunay
 			_sites.length = 0;
 			_sites = null;
 		}
-
+		
 	}
 }

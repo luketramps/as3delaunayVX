@@ -1,17 +1,17 @@
 package com.nodename.Delaunay
 {
-	import __AS3__.vec.Vector;
-	import flash.utils.Dictionary;
+	import com.luketramps.vorox.data.DictionaryPool;
 	import com.nodename.geom.LineSegment;
+	import flash.utils.Dictionary;
 	
 /**
 *  Kruskal's spanning tree algorithm with union-find
  * Skiena: The Algorithm Design Manual, p. 196ff
- * Note: the sites are implied: they consist of the end points of the line segments
+ * Note: the sites are implied: they consist of the end sitePoints of the line segments
 */
 	public function kruskal(lineSegments:Vector.<LineSegment>, type:String = "minimum"):Vector.<LineSegment>
 	{
-		var nodes:Dictionary = new Dictionary(true);
+		var nodes:Dictionary = DictionaryPool.getDictFromSubpool();
 		var mst:Vector.<LineSegment> = new Vector.<LineSegment>();
 		var nodePool:Vector.<Node> = Node.pool;
 		

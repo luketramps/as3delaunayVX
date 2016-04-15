@@ -1,11 +1,12 @@
 package com.nodename.Delaunay
 {
+	import com.luketramps.vorox.data.PointVX;
+	import com.luketramps.vorox.data.VectorPointVXPool;
 	import com.nodename.geom.Circle;
 	import com.nodename.utils.IDisposable;
-	
 	import flash.display.BitmapData;
-	import flash.geom.Point;
 	import flash.geom.Rectangle;
+	
 
 	internal final class SiteList implements IDisposable
 	{
@@ -103,9 +104,9 @@ package com.nodename.Delaunay
 			return colors;
 		}
 
-		public function siteCoords():Vector.<Point>
+		public function siteCoords():Vector.<PointVX>
 		{
-			var coords:Vector.<Point> = new Vector.<Point>();
+			var coords:Vector.<PointVX> = VectorPointVXPool.getObjFromSubpool ();
 			for each (var site:Site in _sites)
 			{
 				coords.push(site.coord);
@@ -133,25 +134,28 @@ package com.nodename.Delaunay
 			return circles;
 		}
 
-		public function regions(plotBounds:Rectangle):Vector.<Vector.<Point>>
+		public function regions(plotBounds:Rectangle):Vector.<Vector.<PointVX>>
 		{
-			var regions:Vector.<Vector.<Point>> = new Vector.<Vector.<Point>>();
+			var regions:Vector.<Vector.<PointVX>> = new Vector.<Vector.<PointVX>>(_sites.length);
 			for each (var site:Site in _sites)
 			{
-				regions.push(site.region(plotBounds));
+				//regions.push(site.region(plotBounds));
+				
+				// LUKE
+				regions[site.lukesIndex] = site.region (plotBounds);
 			}
 			return regions;
 		}
 
 		/**
 		 * 
-		 * @param proximityMap a BitmapData whose regions are filled with the site index values; see PlanePointsCanvas::fillRegions()
+		 * @param proximityMap a BitmapData whose regions are filled with the site index values; see PlanesitePointsCanvas::fillRegions()
 		 * @param x
 		 * @param y
 		 * @return coordinates of nearest Site to (x, y)
 		 * 
 		 */
-		public function nearestSitePoint(proximityMap:BitmapData, x:Number, y:Number):Point
+		public function nearestSiteSiteVX(proximityMap:BitmapData, x:Number, y:Number):PointVX
 		{
 			var index:uint = proximityMap.getPixel(x, y);
 			if (index > _sites.length - 1)

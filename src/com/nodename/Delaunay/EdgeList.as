@@ -1,8 +1,10 @@
 package com.nodename.Delaunay
 {
+	import com.luketramps.vorox.data.HalfEdgePool;
+	import com.luketramps.vorox.data.PointVX;
+	import com.luketramps.vorox.data.VectorHalfEdgePool;
 	import com.nodename.utils.IDisposable;
 	
-	import flash.geom.Point;
 	
 	internal final class EdgeList implements IDisposable
 	{
@@ -24,14 +26,21 @@ package com.nodename.Delaunay
 		
 		public function dispose():void
 		{
-			var halfEdge:Halfedge = _leftEnd;
 			var prevHe:Halfedge;
-			while (halfEdge != _rightEnd)
+			
+			for (var halfEdge:Halfedge = _leftEnd; halfEdge != _rightEnd; halfEdge = halfEdge.edgeListRightNeighbor ) 
+			{
+				halfEdge.dispose ();
+			}
+			
+			//var halfEdge:Halfedge = _leftEnd;
+			/*while (halfEdge != _rightEnd)
 			{
 				prevHe = halfEdge;
 				halfEdge = halfEdge.edgeListRightNeighbor;
 				prevHe.dispose();
-			}
+			}*/
+			
 			_leftEnd = null;
 			_rightEnd.dispose();
 			_rightEnd = null;
@@ -51,11 +60,11 @@ package com.nodename.Delaunay
 			_hashsize = 2 * sqrt_nsites;
 
 			var i:int;
-			_hash = new Vector.<Halfedge>(_hashsize, true);
+			_hash = VectorHalfEdgePool.getVectorFromSubpool (_hashsize); //new Vector.<Halfedge>(_hashsize, true);
 			
 			// two dummy Halfedges:
-			_leftEnd = Halfedge.createDummy();
-			_rightEnd = Halfedge.createDummy();
+			_leftEnd = HalfEdgePool.getHalfedgeFromSubpool (null, null);
+			_rightEnd = HalfEdgePool.getHalfedgeFromSubpool (null, null);
 			_leftEnd.edgeListLeftNeighbor = null;
 			_leftEnd.edgeListRightNeighbor = _rightEnd;
 			_rightEnd.edgeListLeftNeighbor = _leftEnd;
@@ -98,7 +107,7 @@ package com.nodename.Delaunay
 		 * @return 
 		 * 
 		 */
-		public function edgeListLeftNeighbor(p:Point):Halfedge
+		public function edgeListLeftNeighbor(p:PointVX):Halfedge
 		{
 			var i:int, bucket:int;
 			var halfEdge:Halfedge;
@@ -161,7 +170,7 @@ package com.nodename.Delaunay
 			halfEdge = _hash[b]; 
 			if (halfEdge != null && halfEdge.edge == Edge.DELETED)
 			{
-				/* Hash table points to deleted halfedge.  Patch as necessary. */
+				/* Hash table sitePoints to deleted halfedge.  Patch as necessary. */
 				_hash[b] = null;
 				// still can't dispose halfEdge yet!
 				return null;

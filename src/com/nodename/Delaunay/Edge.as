@@ -1,15 +1,18 @@
 package com.nodename.Delaunay
 {
+	import com.luketramps.vorox.data.DictionaryPool;
+	import com.luketramps.vorox.data.EdgePool;
+	import com.luketramps.vorox.data.PointVX;
+	import com.luketramps.vorox.data.PointVXPool;
 	import com.nodename.geom.LineSegment;
-	
 	import flash.display.BitmapData;
 	import flash.display.CapsStyle;
 	import flash.display.Graphics;
 	import flash.display.LineScaleMode;
 	import flash.display.Sprite;
-	import flash.geom.Point;
 	import flash.geom.Rectangle;
 	import flash.utils.Dictionary;
+	
 	
 	/**
 	 * The line segment connecting the two Sites is part of the Delaunay triangulation;
@@ -47,7 +50,7 @@ package com.nodename.Delaunay
 				b = 1.0; a = dx/dy; c /= dy;
 			}
 			
-			var edge:Edge = Edge.create();
+			var edge:Edge = EdgePool.getEdgeFromSubpool (); //Edge.create();
 		
 			edge.leftSite = site0;
 			edge.rightSite = site1;
@@ -62,7 +65,8 @@ package com.nodename.Delaunay
 			
 			return edge;
 		}
-
+		
+		// Lukes mod. Using EdgePool instead.
 		private static function create():Edge
 		{
 			var edge:Edge;
@@ -73,7 +77,8 @@ package com.nodename.Delaunay
 			}
 			else
 			{
-				edge = new Edge(PrivateConstructorEnforcer);
+				edge = new Edge();
+				edge.init ();
 			}
 			return edge;
 		}
@@ -94,8 +99,8 @@ package com.nodename.Delaunay
 		// making this available to Voronoi; running out of memory in AIR so I cannot cache the bmp
 		internal function makeDelaunayLineBmp():BitmapData
 		{
-			var p0:Point = leftSite.coord;
-			var p1:Point = rightSite.coord;
+			var p0:PointVX = leftSite.coord;
+			var p1:PointVX = rightSite.coord;
 			
 			GRAPHICS.clear();
 			// clear() resets line style back to undefined!
@@ -133,7 +138,15 @@ package com.nodename.Delaunay
 
 		private static var _nedges:int = 0;
 		
-		internal static const DELETED:Edge = new Edge(PrivateConstructorEnforcer);
+		// Lukes mod. Not a const anymore.
+		internal static var DELETED:Edge;
+		
+		// Lukes mod. Make it compatible with vorox pooling.
+		public static function createFirstEdge():void
+		{
+			DELETED = new Edge();
+			DELETED._sites = new Dictionary (true); // Use non-disposable dictionary for static edge.
+		}
 		
 		// the equation of the edge: ax + by = c
 		internal var a:Number, b:Number, c:Number;
@@ -173,9 +186,11 @@ package com.nodename.Delaunay
 		
 		public function sitesDistance():Number
 		{
-			return Point.distance(leftSite.coord, rightSite.coord);
+			return PointVX.distance(leftSite.coord, rightSite.coord);
 		}
 		
+		// INLINED
+		/*
 		public static function compareSitesDistances_MAX(edge0:Edge, edge1:Edge):Number
 		{
 			var length0:Number = edge0.sitesDistance();
@@ -190,13 +205,27 @@ package com.nodename.Delaunay
 			}
 			return 0;
 		}
+		*/
 		
 		public static function compareSitesDistances(edge0:Edge, edge1:Edge):Number
 		{
-			return - compareSitesDistances_MAX(edge0, edge1);
+			var length0:Number = edge0.sitesDistance();
+			var length1:Number = edge1.sitesDistance();
+			if (length0 < length1)
+			{
+				return -1;
+			}
+			if (length0 > length1)
+			{
+				return 1;
+			}
+			return 0;
+			
+			// INLINED
+			//return - compareSitesDistances_MAX(edge0, edge1);
 		}
 		
-		// Once clipVertices() is called, this Dictionary will hold two Points
+		// Once clipVertices() is called, this Dictionary will hold two sitePoints
 		// representing the clipped coordinates of the left and right ends...
 		private var _clippedVertices:Dictionary;
 		internal function get clippedEnds():Dictionary
@@ -211,7 +240,7 @@ package com.nodename.Delaunay
 		}
 		
 		// the two input Sites for which this Edge is a bisector:
-		private var _sites:Dictionary;
+		public var _sites:Dictionary;
 		internal function set leftSite(s:Site):void
 		{
 			_sites[LR.LEFT] = s;
@@ -254,32 +283,26 @@ package com.nodename.Delaunay
 			_sites[LR.RIGHT] = null;
 			_sites = null;
 			
-			_pool.push(this);
+			//_pool.push(this);
 		}
 
-		public function Edge(lock:Class)
+		public function Edge()
 		{
-			if (lock != PrivateConstructorEnforcer)
-			{
-				throw new Error("Edge: constructor is private");
-			}
-			
 			_edgeIndex = _nedges++;
-			init();
 		}
 		
-		private function init():void
+		// Lukes mod. Init first edge.
+		//private function initFirst():void
+		//{
+			//_sites = new Dictionary (true);
+		//}
+		
+		// Lukes mod. Init edge in pool.
+		public function init():void
 		{	
-			_sites = new Dictionary(true);
+			_sites = DictionaryPool.getDictFromSubpool();
 		}
 		
-		public function toString():String
-		{
-			return "Edge " + _edgeIndex + "; sites " + _sites[LR.LEFT] + ", " + _sites[LR.RIGHT]
-					+ "; endVertices " + (_leftVertex ? _leftVertex.vertexIndex : "null") + ", "
-					 + (_rightVertex ? _rightVertex.vertexIndex : "null") + "::";
-		}
-
 		/**
 		 * Set _clippedVertices to contain the two ends of the portion of the Voronoi edge that is visible
 		 * within the bounds.  If no part of the Edge falls within the bounds, leave _clippedVertices null. 
@@ -402,20 +425,21 @@ package com.nodename.Delaunay
 				}
 			}
 
-			_clippedVertices = new Dictionary(true);
+			_clippedVertices = DictionaryPool.getDictFromSubpool();
 			if (vertex0 == _leftVertex)
 			{
-				_clippedVertices[LR.LEFT] = new Point(x0, y0);
-				_clippedVertices[LR.RIGHT] = new Point(x1, y1);
+				_clippedVertices[LR.LEFT] = PointVXPool.getPointFromSubpool(x0, y0);
+				_clippedVertices[LR.RIGHT] = PointVXPool.getPointFromSubpool(x1, y1);
 			}
 			else
 			{
-				_clippedVertices[LR.RIGHT] = new Point(x0, y0);
-				_clippedVertices[LR.LEFT] = new Point(x1, y1);
+				_clippedVertices[LR.RIGHT] = PointVXPool.getPointFromSubpool(x0, y0);
+				_clippedVertices[LR.LEFT] = PointVXPool.getPointFromSubpool(x1, y1);
 			}
 		}
 
 	}
 }
 
+// Lukes Mod. Not using this.
 class PrivateConstructorEnforcer {}

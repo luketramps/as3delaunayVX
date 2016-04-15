@@ -1,6 +1,9 @@
 package com.nodename.Delaunay
 {
-	import flash.geom.Point;
+	import com.luketramps.vorox.data.HalfEdgePool;
+	import com.luketramps.vorox.data.PointVX;
+	import com.luketramps.vorox.data.PointVXPool;
+	import com.luketramps.vorox.data.VectorHalfEdgePool;
 	
 	internal final class HalfedgePriorityQueue // also known as heap
 	{
@@ -30,18 +33,19 @@ package com.nodename.Delaunay
 			}
 			_hash = null;
 		}
-
-		private function initialize():void
+		
+		
+		private final function initialize():void
 		{
 			var i:int;
 		
 			_count = 0;
 			_minBucket = 0;
-			_hash = new Vector.<Halfedge>(_hashsize);
+			_hash = VectorHalfEdgePool.getVectorFromSubpool (_hashsize); // new Vector.<Halfedge>(_hashsize);
 			// dummy Halfedge at the top of each hash
 			for (i = 0; i < _hashsize; ++i)
 			{
-				_hash[i] = Halfedge.createDummy();
+				_hash[i] = HalfEdgePool.getHalfedgeFromSubpool (null, null);
 				_hash[i].nextInPriorityQueue = null;
 			}
 		}
@@ -55,6 +59,7 @@ package com.nodename.Delaunay
 				_minBucket = insertionBucket;
 			}
 			previous = _hash[insertionBucket];
+			
 			while ((next = previous.nextInPriorityQueue) != null
 			&&     (halfEdge.ystar  > next.ystar || (halfEdge.ystar == next.ystar && halfEdge.vertex.x > next.vertex.x)))
 			{
@@ -72,11 +77,15 @@ package com.nodename.Delaunay
 			
 			if (halfEdge.vertex != null)
 			{
+				for (previous = _hash[removalBucket]; previous.nextInPriorityQueue != halfEdge; previous = previous.nextInPriorityQueue)
+				{ 
+				}
+				/*
 				previous = _hash[removalBucket];
 				while (previous.nextInPriorityQueue != halfEdge)
 				{
 					previous = previous.nextInPriorityQueue;
-				}
+				}*/
 				previous.nextInPriorityQueue = halfEdge.nextInPriorityQueue;
 				_count--;
 				halfEdge.vertex = null;
@@ -84,8 +93,9 @@ package com.nodename.Delaunay
 				halfEdge.dispose();
 			}
 		}
-
-		private function bucket(halfEdge:Halfedge):int
+		
+		
+		private final function bucket(halfEdge:Halfedge):int
 		{
 			var theBucket:int = (halfEdge.ystar - _ymin)/_deltay * _hashsize;
 			if (theBucket < 0) theBucket = 0;
@@ -93,7 +103,8 @@ package com.nodename.Delaunay
 			return theBucket;
 		}
 		
-		private function isEmpty(bucket:int):Boolean
+		
+		private final function isEmpty(bucket:int):Boolean
 		{
 			return (_hash[bucket].nextInPriorityQueue == null);
 		}
@@ -102,15 +113,20 @@ package com.nodename.Delaunay
 		 * move _minBucket until it contains an actual Halfedge (not just the dummy at the top); 
 		 * 
 		 */
-		private function adjustMinBucket():void
+		
+		private final function adjustMinBucket():void
 		{
-			while (_minBucket < _hashsize - 1 && isEmpty(_minBucket))
+			for (_minBucket; _minBucket < _hashsize - 1 && isEmpty(_minBucket); _minBucket++ ) 
 			{
-				++_minBucket;
 			}
+			//while (_minBucket < _hashsize - 1 && isEmpty(_minBucket))
+			//{
+			//	++_minBucket;
+			//}
 		}
-
-		public function empty():Boolean
+		
+		
+		public final function empty():Boolean
 		{
 			return _count == 0;
 		}
@@ -119,11 +135,12 @@ package com.nodename.Delaunay
 		 * @return coordinates of the Halfedge's vertex in V*, the transformed Voronoi diagram
 		 * 
 		 */
-		public function min():Point
+		
+		public final function min():PointVX
 		{
 			adjustMinBucket();
 			var answer:Halfedge = _hash[_minBucket].nextInPriorityQueue;
-			return new Point(answer.vertex.x, answer.ystar);
+			return PointVXPool.getPointFromSubpool(answer.vertex.x, answer.ystar);
 		}
 
 		/**
@@ -131,7 +148,8 @@ package com.nodename.Delaunay
 		 * @return 
 		 * 
 		 */
-		public function extractMin():Halfedge
+		
+		public final function extractMin():Halfedge
 		{
 			var answer:Halfedge;
 		

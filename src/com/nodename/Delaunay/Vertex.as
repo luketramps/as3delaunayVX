@@ -1,12 +1,28 @@
 package com.nodename.Delaunay
 {
-	import flash.geom.Point;
+	import com.luketramps.vorox.data.PointVX;
+	import com.luketramps.vorox.data.PointVXPool;
+	import com.luketramps.vorox.data.VectorVertexPool;
 	
-	internal final class Vertex extends Object implements ICoord
+	public final class Vertex extends Object implements ICoord
 	{
-		internal static const VERTEX_AT_INFINITY:Vertex = new Vertex(PrivateConstructorEnforcer, NaN, NaN);
+		internal static var VERTEX_AT_INFINITY:Vertex = new Vertex(NaN, NaN);
+		
+		// Lukes mod. Workaround vorox pooling here.
+		public static function createFirstVertex():void 
+		{
+			try {
+				VERTEX_AT_INFINITY = new Vertex(NaN, NaN);
+			}
+			catch (e:*)
+			{
+				trace (VERTEX_AT_INFINITY);
+			}
+		}
 		
 		private static var _pool:Vector.<Vertex> = new Vector.<Vertex>();
+		
+		
 		private static function create(x:Number, y:Number):Vertex
 		{
 			if (isNaN(x) || isNaN(y))
@@ -19,15 +35,15 @@ package com.nodename.Delaunay
 			}
 			else
 			{
-				return new Vertex(PrivateConstructorEnforcer, x, y);
+				return new Vertex(x, y);
 			}
 		}
-
-
+		
+		
 		private static var _nvertices:int = 0;
 		
-		private var _coord:Point;
-		public function get coord():Point
+		private var _coord:PointVX;
+		public function get coord():PointVX
 		{
 			return _coord;
 		}
@@ -37,36 +53,32 @@ package com.nodename.Delaunay
 			return _vertexIndex;
 		}
 		
-		public function Vertex(lock:Class, x:Number, y:Number)
+		public function Vertex(x:Number, y:Number) // Lukes mod. Remove private constructor enforcer lock.
 		{
-			if (lock != PrivateConstructorEnforcer)
-			{
-				throw new Error("Vertex constructor is private");
-			}
-			
 			init(x, y);
 		}
 		
 		private function init(x:Number, y:Number):Vertex
 		{
-			_coord = new Point(x, y);
+			if (_coord)
+			{
+				_coord.x = x;
+				_coord.y = y;
+			}
+			else _coord = new PointVX (x, y); // Lukes mod. Don't pool points here, they stay in mem.
+			
 			return this;
 		}
 		
 		public function dispose():void
 		{
-			_coord = null;
+			//_coord = null; // Lukes mod. Don't garbage collect theese.
 			_pool.push(this);
 		}
 		
 		public function setIndex():void
 		{
 			_vertexIndex = _nvertices++;
-		}
-		
-		public function toString():String
-		{
-			return "Vertex (" + _vertexIndex + ")";
 		}
 
 		/**
@@ -104,8 +116,16 @@ package com.nodename.Delaunay
 		
 			intersectionX = (edge0.c * edge1.b - edge1.c * edge0.b)/determinant;
 			intersectionY = (edge1.c * edge0.a - edge0.c * edge1.a)/determinant;
-		
-			if (Voronoi.compareByYThenX(edge0.rightSite, edge1.rightSite) < 0)
+			
+			// Inlined compareByXThenY function.
+			var comparedXThenY:int;
+			if (edge0.rightSite.y < edge1.rightSite.y) comparedXThenY = -1;
+			else if (edge0.rightSite.y > edge1.rightSite.y) comparedXThenY = 1;
+			else if (edge0.rightSite.x < edge1.rightSite.x) comparedXThenY = -1;
+			else if (edge0.rightSite.x > edge1.rightSite.x) comparedXThenY = 1;
+			else comparedXThenY = 0;
+			
+			if (comparedXThenY < 0)
 			{
 				halfedge = halfedge0; edge = edge0;
 			}
@@ -120,7 +140,21 @@ package com.nodename.Delaunay
 				return null;
 			}
 		
-			return Vertex.create(intersectionX, intersectionY);
+			// Inline create function.
+			//return Vertex.create(intersectionX, intersectionY);
+			
+			if (isNaN(intersectionX) || isNaN(intersectionY))
+			{
+				return VERTEX_AT_INFINITY;
+			}
+			if (_pool.length > 0)
+			{
+				return _pool.pop().init(intersectionX, intersectionY);
+			}
+			else
+			{
+				return new Vertex(intersectionX, intersectionY);
+			}
 		}
 		
 		public function get x():Number
@@ -132,7 +166,10 @@ package com.nodename.Delaunay
 			return _coord.y;
 		}
 		
+		static public function set AT_INFINITY(value:Vertex):void 
+		{
+			VERTEX_AT_INFINITY = value;
+		}
+		
 	}
 }
-
-class PrivateConstructorEnforcer {}

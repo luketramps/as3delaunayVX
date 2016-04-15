@@ -15,13 +15,20 @@
 
 package com.nodename.Delaunay
 {
+	import com.luketramps.vorox.data.DictionaryPool;
+	import com.luketramps.vorox.data.HalfEdgePool;
+	import com.luketramps.vorox.data.PointVX;
+	import com.luketramps.vorox.data.PointVXPool;
+	import com.luketramps.vorox.data.VectorEdgePool;
+	import com.luketramps.vorox.data.VectorHalfEdgePool;
+	import com.luketramps.vorox.data.VectorPointVXPool;
+	import com.luketramps.vorox.data.VectorVertexPool;
 	import com.nodename.geom.Circle;
 	import com.nodename.geom.LineSegment;
-	
 	import flash.display.BitmapData;
-	import flash.geom.Point;
 	import flash.geom.Rectangle;
 	import flash.utils.Dictionary;
+	
 	
 	public final class Voronoi
 	{
@@ -29,7 +36,6 @@ package com.nodename.Delaunay
 		private var _sitesIndexedByLocation:Dictionary;
 		private var _triangles:Vector.<Triangle>;
 		private var _edges:Vector.<Edge>;
-
 		
 		// TODO generalize this so it doesn't have to be a rectangle;
 		// then we can make the fractal voronois-within-voronois
@@ -60,10 +66,11 @@ package com.nodename.Delaunay
 			if (_edges)
 			{
 				n = _edges.length;
-				for (i = 0; i < n; ++i)
-				{
-					_edges[i].dispose();
-				}
+				// Lukes mod. Done by EdgePool.
+				//for (i = 0; i < n; ++i)
+				//{
+					//_edges[i].dispose();
+				//}
 				_edges.length = 0;
 				_edges = null;
 			}
@@ -71,27 +78,29 @@ package com.nodename.Delaunay
 			_sitesIndexedByLocation = null;
 		}
 		
-		public function Voronoi(points:Vector.<Point>, colors:Vector.<uint>, plotBounds:Rectangle)
+		public function Voronoi(sitePoints:Vector.<PointVX>, colors:Vector.<uint>, plotBounds:Rectangle)
 		{
 			_sites = new SiteList();
-			_sitesIndexedByLocation = new Dictionary(true);
-			addSites(points, colors);
+			_sitesIndexedByLocation = DictionaryPool.getDictFromSubpool();
+			addSites(sitePoints, colors);
 			_plotBounds = plotBounds;
 			_triangles = new Vector.<Triangle>();
-			_edges = new Vector.<Edge>();
+			_edges = VectorEdgePool.getObjFromSubpool ();
 			fortunesAlgorithm();
 		}
 		
-		private function addSites(points:Vector.<Point>, colors:Vector.<uint>):void
+		
+		private final function addSites(sitePoints:Vector.<PointVX>, colors:Vector.<uint>):void
 		{
-			var length:uint = points.length;
+			var length:uint = sitePoints.length;
 			for (var i:uint = 0; i < length; ++i)
 			{
-				addSite(points[i], colors ? colors[i] : 0, i);
+				addSite(sitePoints[i], colors ? colors[0] : 0, i);
 			}
 		}
 		
-		private function addSite(p:Point, color:uint, index:int):void
+		
+		private final function addSite(p:PointVX, color:uint, index:int):void
 		{
 			var weight:Number = Math.random() * 100;
 			var site:Site = Site.create(p, index, weight, color);
@@ -104,32 +113,32 @@ package com.nodename.Delaunay
                 	return _edges;
                 }
           
-		public function region(p:Point):Vector.<Point>
+		public function region(p:PointVX):Vector.<PointVX>
 		{
 			var site:Site = _sitesIndexedByLocation[p];
 			if (!site)
 			{
-				return new Vector.<Point>();
+				return VectorPointVXPool..getObjFromSubpool ();
 			}
 			return site.region(_plotBounds);
 		}
 
           // TODO: bug: if you call this before you call region(), something goes wrong :(
-		public function neighborSitesForSite(coord:Point):Vector.<Point>
+		public function neighborSitesForSite(coord:PointVX):Vector.<PointVX>
 		{
-			var points:Vector.<Point> = new Vector.<Point>();
+			var sitePoints:Vector.<PointVX> = VectorPointVXPool.getObjFromSubpool ();
 			var site:Site = _sitesIndexedByLocation[coord];
 			if (!site)
 			{
-				return points;
+				return sitePoints;
 			}
 			var sites:Vector.<Site> = site.neighborSites();
 			var neighbor:Site;
 			for each (neighbor in sites)
 			{
-				points.push(neighbor.coord);
+				sitePoints.push(neighbor.coord);
 			}
-			return points;
+			return sitePoints;
 		}
 
 		public function circles():Vector.<Circle>
@@ -137,12 +146,12 @@ package com.nodename.Delaunay
 			return _sites.circles();
 		}
 		
-		public function voronoiBoundaryForSite(coord:Point):Vector.<LineSegment>
+		public function voronoiBoundaryForSite(coord:PointVX):Vector.<LineSegment>
 		{
 			return visibleLineSegments(selectEdgesForSitePoint(coord, _edges));
 		}
 
-		public function delaunayLinesForSite(coord:Point):Vector.<LineSegment>
+		public function delaunayLinesForSite(coord:PointVX):Vector.<LineSegment>
 		{
 			return delaunayLinesForEdges(selectEdgesForSitePoint(coord, _edges));
 		}
@@ -162,7 +171,8 @@ package com.nodename.Delaunay
 			return delaunayLinesForEdges(hullEdges());
 		}
 		
-		private function hullEdges():Vector.<Edge>
+		
+		private final function hullEdges():Vector.<Edge>
 		{
 			return _edges.filter(myTest);
 		
@@ -172,20 +182,20 @@ package com.nodename.Delaunay
 			}
 		}
 
-		public function hullPointsInOrder():Vector.<Point>
+		public function hullsitePointsInOrder():Vector.<PointVX>
 		{
 			var hullEdges:Vector.<Edge> = hullEdges();
 			
-			var points:Vector.<Point> = new Vector.<Point>();
+			var sitePoints:Vector.<PointVX> = VectorPointVXPool.getObjFromSubpool ();
 			if (hullEdges.length == 0)
 			{
-				return points;
+				return sitePoints;
 			}
 			
-			var reorderer:EdgeReorderer = new EdgeReorderer(hullEdges, Site);
-			hullEdges = reorderer.edges;
-			var orientations:Vector.<LR> = reorderer.edgeOrientations;
-			reorderer.dispose();
+			EdgeReorderer2.reorder (hullEdges, Site); //var reorderer:EdgeReorderer = new EdgeReorderer(hullEdges, Site);
+			hullEdges = EdgeReorderer2.edges;
+			var orientations:Vector.<LR> = EdgeReorderer2.edgeOrientations;
+			//reorderer.dispose();
 			
 			var orientation:LR;
 
@@ -194,9 +204,9 @@ package com.nodename.Delaunay
 			{
 				var edge:Edge = hullEdges[i];
 				orientation = orientations[i];
-				points.push(edge.site(orientation).coord);
+				sitePoints.push(edge.site(orientation).coord);
 			}
-			return points;
+			return sitePoints;
 		}
 		
 		public function spanningTree(type:String = "minimum", keepOutMask:BitmapData = null):Vector.<LineSegment>
@@ -205,8 +215,8 @@ package com.nodename.Delaunay
 			var segments:Vector.<LineSegment> = delaunayLinesForEdges(edges);
 			return kruskal(segments, type);
 		}
-
-		public function regions():Vector.<Vector.<Point>>
+		
+		public function regions():Vector.<Vector.<PointVX>>
 		{
 			return _sites.regions(_plotBounds);
 		}
@@ -218,27 +228,27 @@ package com.nodename.Delaunay
 		
 		/**
 		 * 
-		 * @param proximityMap a BitmapData whose regions are filled with the site index values; see PlanePointsCanvas::fillRegions()
+		 * @param proximityMap a BitmapData whose regions are filled with the site index values; see PlanesitePointsCanvas::fillRegions()
 		 * @param x
 		 * @param y
 		 * @return coordinates of nearest Site to (x, y)
 		 * 
 		 */
-		public function nearestSitePoint(proximityMap:BitmapData, x:Number, y:Number):Point
+		public function nearestSiteSiteVX(proximityMap:BitmapData, x:Number, y:Number):PointVX
 		{
-			return _sites.nearestSitePoint(proximityMap, x, y);
+			return _sites.nearestSiteSiteVX(proximityMap, x, y);
 		}
 		
-		public function siteCoords():Vector.<Point>
+		public function siteCoords():Vector.<PointVX>
 		{
 			return _sites.siteCoords();
 		}
-
+		
 		private function fortunesAlgorithm():void
 		{
 			var newSite:Site, bottomSite:Site, topSite:Site, tempSite:Site;
 			var v:Vertex, vertex:Vertex;
-			var newintstar:Point;
+			var newintstar:PointVX;
 			var leftRight:LR;
 			var lbnd:Halfedge, rbnd:Halfedge, llbnd:Halfedge, rrbnd:Halfedge, bisector:Halfedge;
 			var edge:Edge;
@@ -248,8 +258,8 @@ package com.nodename.Delaunay
 			var sqrt_nsites:int = int(Math.sqrt(_sites.length + 4));
 			var heap:HalfedgePriorityQueue = new HalfedgePriorityQueue(dataBounds.y, dataBounds.height, sqrt_nsites);
 			var edgeList:EdgeList = new EdgeList(dataBounds.x, dataBounds.width, sqrt_nsites);
-			var halfEdges:Vector.<Halfedge> = new Vector.<Halfedge>();
-			var vertices:Vector.<Vertex> = new Vector.<Vertex>();
+			var halfEdges:Vector.<Halfedge> = VectorHalfEdgePool.getVectorFromSubpool (); // new Vector.<Halfedge>();
+			var vertices:Vector.<Vertex> = VectorVertexPool.getVectorFromSubpool (); //new Vector.<Vertex>();
 			
 			var bottomMostSite:Site = _sites.next();
 			newSite = _sites.next();
@@ -259,10 +269,20 @@ package com.nodename.Delaunay
 				if (heap.empty() == false)
 				{
 					newintstar = heap.min();
+					
+					if (newSite) // Lukes mod. Inlined compareByXThenY function.
+					{
+						var comparedXThenY:int;
+						if (newSite.y < newintstar.y) comparedXThenY = -1;
+						else if (newSite.y > newintstar.y) comparedXThenY = 1;
+						else if (newSite.x < newintstar.x) comparedXThenY = -1;
+						else if (newSite.x > newintstar.x) comparedXThenY = 1;
+						else comparedXThenY = 0;
+					}
 				}
-			
+				
 				if (newSite != null 
-				&&  (heap.empty() || compareByYThenX(newSite, newintstar) < 0))
+				&&  (heap.empty() || comparedXThenY < 0))
 				{
 					/* new site is smallest */
 					//trace("smallest: new site " + newSite);
@@ -272,7 +292,7 @@ package com.nodename.Delaunay
 					//trace("lbnd: " + lbnd);
 					rbnd = lbnd.edgeListRightNeighbor;		// the Halfedge just to the right
 					//trace("rbnd: " + rbnd);
-					bottomSite = rightRegion(lbnd);		// this is the same as leftRegion(rbnd)
+					bottomSite = (lbnd.edge) ? lbnd.edge.site (LR.other(lbnd.leftRight)) : bottomMostSite // rightRegion(lbnd);		// this is the same as leftRegion(rbnd)
 					// this Site determines the region containing the new site
 					//trace("new Site is in region of existing site: " + bottomSite);
 					
@@ -281,7 +301,7 @@ package com.nodename.Delaunay
 					//trace("new edge: " + edge);
 					_edges.push(edge);
 					
-					bisector = Halfedge.create(edge, LR.LEFT);
+					bisector = HalfEdgePool.getHalfedgeFromSubpool (edge, LR.LEFT);
 					halfEdges.push(bisector);
 					// inserting two Halfedges into edgeList constitutes Step 10:
 					// insert bisector to the right of lbnd:
@@ -298,7 +318,7 @@ package com.nodename.Delaunay
 					}
 					
 					lbnd = bisector;
-					bisector = Halfedge.create(edge, LR.RIGHT);
+					bisector = HalfEdgePool.getHalfedgeFromSubpool (edge, LR.RIGHT);
 					halfEdges.push(bisector);
 					// second Halfedge for Step 10:
 					// insert bisector to the right of lbnd:
@@ -322,8 +342,8 @@ package com.nodename.Delaunay
 					llbnd = lbnd.edgeListLeftNeighbor;
 					rbnd = lbnd.edgeListRightNeighbor;
 					rrbnd = rbnd.edgeListRightNeighbor;
-					bottomSite = leftRegion(lbnd);
-					topSite = rightRegion(rbnd);
+					bottomSite = (lbnd.edge) ? lbnd.edge.site (lbnd.leftRight) : bottomMostSite; // leftRegion(lbnd); // 
+					topSite = (rbnd.edge) ? rbnd.edge.site (LR.other (rbnd.leftRight)) : bottomMostSite; //rightRegion(rbnd);
 					// these three sites define a Delaunay triangle
 					// (not actually using these for anything...)
 					//_triangles.push(new Triangle(bottomSite, topSite, rightRegion(lbnd)));
@@ -342,7 +362,7 @@ package com.nodename.Delaunay
 					}
 					edge = Edge.createBisectingEdge(bottomSite, topSite);
 					_edges.push(edge);
-					bisector = Halfedge.create(edge, leftRight);
+					bisector = HalfEdgePool.getHalfedgeFromSubpool (edge, leftRight);
 					halfEdges.push(bisector);
 					edgeList.insert(llbnd, bisector);
 					edge.setVertex(LR.other(leftRight), v);
@@ -389,28 +409,9 @@ package com.nodename.Delaunay
 				vertex.dispose();
 			}
 			vertices.length = 0;
-			
-			function leftRegion(he:Halfedge):Site
-			{
-				var edge:Edge = he.edge;
-				if (edge == null)
-				{
-					return bottomMostSite;
-				}
-				return edge.site(he.leftRight);
-			}
-			
-			function rightRegion(he:Halfedge):Site
-			{
-				var edge:Edge = he.edge;
-				if (edge == null)
-				{
-					return bottomMostSite;
-				}
-				return edge.site(LR.other(he.leftRight));
-			}
 		}
-
+		
+		// Lukes mod. This function was inlined by hand.
 		internal static function compareByYThenX(s1:Site, s2:*):Number
 		{
 			if (s1.y < s2.y) return -1;

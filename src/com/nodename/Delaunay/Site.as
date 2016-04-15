@@ -1,15 +1,19 @@
 package com.nodename.Delaunay
 {
+	import com.luketramps.vorox.data.PointVX;
+	import com.luketramps.vorox.data.PointVXPool;
+	import com.luketramps.vorox.data.VectorEdgePool;
+	import com.luketramps.vorox.data.VectorPointVXPool;
 	import com.nodename.geom.Polygon;
+	import com.nodename.geom.Polygon2;
 	import com.nodename.geom.Winding;
-	
-	import flash.geom.Point;
 	import flash.geom.Rectangle;
+	
 	
 	public final class Site implements ICoord
 	{
 		private static var _pool:Vector.<Site> = new Vector.<Site>();
-		public static function create(p:Point, index:int, weight:Number, color:uint):Site
+		public static function create(p:PointVX, index:int, weight:Number, color:uint):Site
 		{
 			if (_pool.length > 0)
 			{
@@ -17,7 +21,7 @@ package com.nodename.Delaunay
 			}
 			else
 			{
-				return new Site(PrivateConstructorEnforcer, p, index, weight, color);
+				return new Site(p, index, weight, color);
 			}
 		}
 		
@@ -36,7 +40,15 @@ package com.nodename.Delaunay
 		 */
 		private static function compare(s1:Site, s2:Site):Number
 		{
-			var returnValue:int = Voronoi.compareByYThenX(s1, s2);
+			// Inline Voronoi.compareByXThenY function.
+			var returnValue:int;
+			if (s1.y < s2.y) returnValue = -1;
+			else if (s1.y > s2.y) returnValue = 1;
+			else if (s1.x < s2.x) returnValue = -1;
+			else if (s1.x > s2.x) returnValue = 1;
+			else returnValue = 0;
+			
+			//var returnValue:int = Voronoi.compareByYThenX(s1, s2);
 			
 			// swap _siteIndex values if necessary to match new ordering:
 			var tempIndex:int;
@@ -65,19 +77,22 @@ package com.nodename.Delaunay
 
 
 		private static const EPSILON:Number = .005;
-		private static function closeEnough(p0:Point, p1:Point):Boolean
+		private static function closeEnough(p0:PointVX, p1:PointVX):Boolean
 		{
-			return Point.distance(p0, p1) < EPSILON;
+			return PointVX.distance(p0, p1) < EPSILON;
 		}
 				
-		private var _coord:Point;
-		public function get coord():Point
+		private var _coord:PointVX;
+		public final function get coord():PointVX
 		{
 			return _coord;
 		}
 		
 		internal var color:uint;
 		internal var weight:Number;
+		
+		// LUKE
+		public var lukesIndex:uint;
 		
 		private var _siteIndex:uint;
 		
@@ -89,35 +104,27 @@ package com.nodename.Delaunay
 		}
 		// which end of each edge hooks up with the previous edge in _edges:
 		private var _edgeOrientations:Vector.<LR>;
-		// ordered list of points that define the region clipped to bounds:
-		private var _region:Vector.<Point>;
+		// ordered list of sitePoints that define the region clipped to bounds:
+		private var _region:Vector.<PointVX>;
 
-		public function Site(lock:Class, p:Point, index:int, weight:Number, color:uint)
+		public function Site(p:PointVX, index:int, weight:Number, color:uint) // Lukes mod. Removed private constructor enforcer lock.
 		{
-			if (lock != PrivateConstructorEnforcer)
-			{
-				throw new Error("Site constructor is private");
-			}
-			init(p, index, weight, color);
+			init (p, index, weight, color);
 		}
 		
-		private function init(p:Point, index:int, weight:Number, color:uint):Site
+		private function init(p:PointVX, index:int, weight:Number, color:uint):Site
 		{
 			_coord = p;
 			_siteIndex = index;
+			lukesIndex = index;
 			this.weight = weight;
 			this.color = color;
-			_edges = new Vector.<Edge>();
+			_edges = VectorEdgePool.getObjFromSubpool ();
 			_region = null;
 			return this;
 		}
 		
-		public function toString():String
-		{
-			return "Site " + _siteIndex + ": " + coord;
-		}
-		
-		private function move(p:Point):void
+		private function move(p:PointVX):void
 		{
 			clear();
 			_coord = p;
@@ -130,7 +137,8 @@ package com.nodename.Delaunay
 			_pool.push(this);
 		}
 		
-		private function clear():void
+		
+		private final function clear():void
 		{
 			if (_edges)
 			{
@@ -172,14 +180,20 @@ package com.nodename.Delaunay
 			}
 			var list:Vector.<Site> = new Vector.<Site>();
 			var edge:Edge;
+			var edgeCount:uint = _edges.length;
+			//for (var i:int = 0; i < edgeCount; i++) 
+			//{
+				//list.push (neighborSite(_edges[i]));
+			//}
 			for each (edge in _edges)
 			{
 				list.push(neighborSite(edge));
 			}
 			return list;
 		}
-			
-		private function neighborSite(edge:Edge):Site
+		
+		
+		private final function neighborSite(edge:Edge):Site
 		{
 			if (this == edge.leftSite)
 			{
@@ -192,17 +206,21 @@ package com.nodename.Delaunay
 			return null;
 		}
 		
-		internal function region(clippingBounds:Rectangle):Vector.<Point>
+		internal static var countFoo:uint = 0;
+		internal function region(clippingBounds:Rectangle):Vector.<PointVX>
 		{
+			countFoo++;
+			if (countFoo == 61)
+				trace ("braek");
 			if (_edges == null || _edges.length == 0)
 			{
-				return new Vector.<Point>();
+				return VectorPointVXPool.getObjFromSubpool (); //VectorPointVXPool.getObjFromSubpool ();
 			}
 			if (_edgeOrientations == null)
 			{ 
 				reorderEdges();
 				_region = clipToBounds(clippingBounds);
-				if ((new Polygon(_region)).winding() == Winding.CLOCKWISE)
+				if ((Polygon2.winding(_region)) == Winding.CLOCKWISE)
 				{
 					_region = _region.reverse();
 				}
@@ -210,36 +228,44 @@ package com.nodename.Delaunay
 			return _region;
 		}
 		
-		private function reorderEdges():void
+		
+		private final function reorderEdges():void
 		{
-			//trace("_edges:", _edges);
-			var reorderer:EdgeReorderer = new EdgeReorderer(_edges, Vertex);
-			_edges = reorderer.edges;
-			//trace("reordered:", _edges);
-			_edgeOrientations = reorderer.edgeOrientations;
-			reorderer.dispose();
+			EdgeReorderer2.reorder (_edges, Vertex); //var reorderer:EdgeReorderer = new EdgeReorderer(_edges, Vertex);
+			_edges = EdgeReorderer2.edges;
+			_edgeOrientations = EdgeReorderer2.edgeOrientations;
 		}
 		
-		private function clipToBounds(bounds:Rectangle):Vector.<Point>
+		
+		private final function clipToBounds(bounds:Rectangle):Vector.<PointVX>
 		{
-			var points:Vector.<Point> = new Vector.<Point>;
+			var sitePoints:Vector.<PointVX> = VectorPointVXPool.getObjFromSubpool ();
 			var n:int = _edges.length;
 			var i:int = 0;
 			var edge:Edge;
-			while (i < n && ((_edges[i] as Edge).visible == false))
+			
+			for (i = 0; i < n && ((_edges[i] as Edge).visible == false); i++) 
+			{
+			}
+			
+			/*while (i < n && ((_edges[i] as Edge).visible == false))
 			{
 				++i;
-			}
+			}*/
 			
 			if (i == n)
 			{
 				// no edges visible
-				return new Vector.<Point>();
+				return VectorPointVXPool.getObjFromSubpool ();
 			}
 			edge = _edges[i];
+			
+			if (!edge.clippedEnds[orientation] is PointVX)
+				trace ("break");
+			
 			var orientation:LR = _edgeOrientations[i];
-			points.push(edge.clippedEnds[orientation]);
-			points.push(edge.clippedEnds[LR.other(orientation)]);
+			sitePoints.push(edge.clippedEnds[orientation]);
+			sitePoints.push(edge.clippedEnds[LR.other(orientation)]);
 			
 			for (var j:int = i + 1; j < n; ++j)
 			{
@@ -248,35 +274,36 @@ package com.nodename.Delaunay
 				{
 					continue;
 				}
-				connect(points, j, bounds);
+				connect(sitePoints, j, bounds);
 			}
-			// close up the polygon by adding another corner point of the bounds if needed:
-			connect(points, i, bounds, true);
+			// close up the polygon by adding another corner SiteVX of the bounds if needed:
+			connect(sitePoints, i, bounds, true);
 			
-			return points;
+			return sitePoints;
 		}
 		
-		private function connect(points:Vector.<Point>, j:int, bounds:Rectangle, closingUp:Boolean = false):void
+		//
+		private final function connect(sitePoints:Vector.<PointVX>, j:int, bounds:Rectangle, closingUp:Boolean = false):void
 		{
-			var rightPoint:Point = points[points.length - 1];
+			var rightSiteVX:PointVX = sitePoints[sitePoints.length - 1];
 			var newEdge:Edge = _edges[j] as Edge;
 			var newOrientation:LR = _edgeOrientations[j];
-			// the point that  must be connected to rightPoint:
-			var newPoint:Point = newEdge.clippedEnds[newOrientation];
-			if (!closeEnough(rightPoint, newPoint))
+			// the SiteVX that  must be connected to rightSiteVX:
+			var newSiteVX:PointVX = newEdge.clippedEnds[newOrientation];
+			if (!closeEnough(rightSiteVX, newSiteVX))
 			{
-				// The points do not coincide, so they must have been clipped at the bounds;
+				// The sitePoints do not coincide, so they must have been clipped at the bounds;
 				// see if they are on the same border of the bounds:
-				if (rightPoint.x != newPoint.x
-				&&  rightPoint.y != newPoint.y)
+				if (rightSiteVX.x != newSiteVX.x
+				&&  rightSiteVX.y != newSiteVX.y)
 				{
 					// They are on different borders of the bounds;
 					// insert one or two corners of bounds as needed to hook them up:
 					// (NOTE this will not be correct if the region should take up more than
 					// half of the bounds rect, for then we will have gone the wrong way
 					// around the bounds and included the smaller part rather than the larger)
-					var rightCheck:int = BoundsCheck.check(rightPoint, bounds);
-					var newCheck:int = BoundsCheck.check(newPoint, bounds);
+					var rightCheck:int = BoundsCheck.check(rightSiteVX, bounds);
+					var newCheck:int = BoundsCheck.check(newSiteVX, bounds);
 					var px:Number, py:Number;
 					if (rightCheck & BoundsCheck.RIGHT)
 					{
@@ -284,16 +311,16 @@ package com.nodename.Delaunay
 						if (newCheck & BoundsCheck.BOTTOM)
 						{
 							py = bounds.bottom;
-							points.push(new Point(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
 						}
 						else if (newCheck & BoundsCheck.TOP)
 						{
 							py = bounds.top;
-							points.push(new Point(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
 						}
 						else if (newCheck & BoundsCheck.LEFT)
 						{
-							if (rightPoint.y - bounds.y + newPoint.y - bounds.y < bounds.height)
+							if (rightSiteVX.y - bounds.y + newSiteVX.y - bounds.y < bounds.height)
 							{
 								py = bounds.top;
 							}
@@ -301,8 +328,8 @@ package com.nodename.Delaunay
 							{
 								py = bounds.bottom;
 							}
-							points.push(new Point(px, py));
-							points.push(new Point(bounds.left, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(bounds.left, py));
 						}
 					}
 					else if (rightCheck & BoundsCheck.LEFT)
@@ -311,16 +338,16 @@ package com.nodename.Delaunay
 						if (newCheck & BoundsCheck.BOTTOM)
 						{
 							py = bounds.bottom;
-							points.push(new Point(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
 						}
 						else if (newCheck & BoundsCheck.TOP)
 						{
 							py = bounds.top;
-							points.push(new Point(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
 						}
 						else if (newCheck & BoundsCheck.RIGHT)
 						{
-							if (rightPoint.y - bounds.y + newPoint.y - bounds.y < bounds.height)
+							if (rightSiteVX.y - bounds.y + newSiteVX.y - bounds.y < bounds.height)
 							{
 								py = bounds.top;
 							}
@@ -328,8 +355,8 @@ package com.nodename.Delaunay
 							{
 								py = bounds.bottom;
 							}
-							points.push(new Point(px, py));
-							points.push(new Point(bounds.right, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(bounds.right, py));
 						}
 					}
 					else if (rightCheck & BoundsCheck.TOP)
@@ -338,16 +365,16 @@ package com.nodename.Delaunay
 						if (newCheck & BoundsCheck.RIGHT)
 						{
 							px = bounds.right;
-							points.push(new Point(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
 						}
 						else if (newCheck & BoundsCheck.LEFT)
 						{
 							px = bounds.left;
-							points.push(new Point(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
 						}
 						else if (newCheck & BoundsCheck.BOTTOM)
 						{
-							if (rightPoint.x - bounds.x + newPoint.x - bounds.x < bounds.width)
+							if (rightSiteVX.x - bounds.x + newSiteVX.x - bounds.x < bounds.width)
 							{
 								px = bounds.left;
 							}
@@ -355,8 +382,8 @@ package com.nodename.Delaunay
 							{
 								px = bounds.right;
 							}
-							points.push(new Point(px, py));
-							points.push(new Point(px, bounds.bottom));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, bounds.bottom));
 						}
 					}
 					else if (rightCheck & BoundsCheck.BOTTOM)
@@ -365,16 +392,16 @@ package com.nodename.Delaunay
 						if (newCheck & BoundsCheck.RIGHT)
 						{
 							px = bounds.right;
-							points.push(new Point(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
 						}
 						else if (newCheck & BoundsCheck.LEFT)
 						{
 							px = bounds.left;
-							points.push(new Point(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
 						}
 						else if (newCheck & BoundsCheck.TOP)
 						{
-							if (rightPoint.x - bounds.x + newPoint.x - bounds.x < bounds.width)
+							if (rightSiteVX.x - bounds.x + newSiteVX.x - bounds.x < bounds.width)
 							{
 								px = bounds.left;
 							}
@@ -382,8 +409,8 @@ package com.nodename.Delaunay
 							{
 								px = bounds.right;
 							}
-							points.push(new Point(px, py));
-							points.push(new Point(px, bounds.top));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, py));
+							sitePoints.push(PointVXPool.getPointFromSubpool(px, bounds.top));
 						}
 					}
 				}
@@ -392,15 +419,15 @@ package com.nodename.Delaunay
 					// newEdge's ends have already been added
 					return;
 				}
-				points.push(newPoint);
+				sitePoints.push(newSiteVX);
 			}
-			var newRightPoint:Point = newEdge.clippedEnds[LR.other(newOrientation)];
-			if (!closeEnough(points[0], newRightPoint))
+			var newRightSiteVX:PointVX = newEdge.clippedEnds[LR.other(newOrientation)];
+			if (!closeEnough(sitePoints[0], newRightSiteVX))
 			{
-				points.push(newRightPoint);
+				sitePoints.push(newRightSiteVX);
 			}
 		}
-								
+		
 		internal function get x():Number
 		{
 			return _coord.x;
@@ -412,7 +439,7 @@ package com.nodename.Delaunay
 		
 		internal function dist(p:ICoord):Number
 		{
-			return Point.distance(p.coord, this._coord);
+			return PointVX.distance(p.coord, this._coord);
 		}
 
 	}
@@ -420,7 +447,7 @@ package com.nodename.Delaunay
 
 	class PrivateConstructorEnforcer {}
 
-	import flash.geom.Point;
+	import com.luketramps.vorox.data.PointVX;
 	import flash.geom.Rectangle;
 	
 	final class BoundsCheck
@@ -432,27 +459,27 @@ package com.nodename.Delaunay
 		
 		/**
 		 * 
-		 * @param point
+		 * @param SiteVX
 		 * @param bounds
-		 * @return an int with the appropriate bits set if the Point lies on the corresponding bounds lines
+		 * @return an int with the appropriate bits set if the SiteVX lies on the corresponding bounds lines
 		 * 
 		 */
-		public static function check(point:Point, bounds:Rectangle):int
+		public static function check(p:PointVX, bounds:Rectangle):int
 		{
 			var value:int = 0;
-			if (point.x == bounds.left)
+			if (p.x == bounds.left)
 			{
 				value |= LEFT;
 			}
-			if (point.x == bounds.right)
+			if (p.x == bounds.right)
 			{
 				value |= RIGHT;
 			}
-			if (point.y == bounds.top)
+			if (p.y == bounds.top)
 			{
 				value |= TOP;
 			}
-			if (point.y == bounds.bottom)
+			if (p.y == bounds.bottom)
 			{
 				value |= BOTTOM;
 			}

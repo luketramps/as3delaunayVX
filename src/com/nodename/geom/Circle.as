@@ -1,16 +1,16 @@
 package com.nodename.geom
 {
-	import flash.geom.Point;
+	import com.luketramps.vorox.data.PointVX;
 	
 	public final class Circle extends Object
 	{
-		public var center:Point;
+		public var center:PointVX;
 		public var radius:Number;
 		
 		public function Circle(centerX:Number, centerY:Number, radius:Number)
 		{
 			super();
-			this.center = new Point(centerX, centerY);
+			this.center = new PointVX(centerX, centerY);
 			this.radius = radius;
 		}
 		
