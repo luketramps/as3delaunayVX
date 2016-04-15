@@ -1,16 +1,14 @@
-Orignal "as3delauney Project Page":http://nodename.github.com/as3delaunay/ .
+Orignal [as3delauney Project Page](http://nodename.github.com/as3delaunay/) .
 
 
 -----------------------------------------------
 Fork info: as3delauneyVX
 
-If you want to create anyting graphical with actionscript and voronoi digaramms, check out "VoroX":http://github.com/luketramps/vorox first.
+If you want to create anyting graphical with actionscript and voronoi digaramms, check out [VoroX](http://github.com/luketramps/vorox) .
 
-I have used this version of Alan Shaws project 'as3delaunay' while working on VoroX. It was a side thing for me to optimize here and there over time, so the actual modifications to this fork are rather hard to determine, if you are not familiar with the original code.
+I have used this version of Alan Shaws as3delaunay while working on VoroX. It was a side thing for me to optimize here and there over time, so the actual modifications to this fork are rather hard to determine, if you are not familiar with the original code.
 
 How ever, this fork features a pretty brutal pooling solution that saves garbage collection time, while actionscript execution times are slightly higer. References created by as3delauney code are coming mostly from pools instead of beeing reinstanciated. Each instance of Voronoi class gets multiple ids assigned. Theese ids are like keys to disposing all the references, an Voronoi object has created and returning them into pools. 
-
-Like this.
 
 ```actionscript3
 package 
